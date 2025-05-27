@@ -1,0 +1,311 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>DIVA's Script Hub</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+
+    body {
+      background: radial-gradient(circle at top left, #2a2a2a, #1a1a1a);
+      color: #ffffff;
+      min-height: 100vh;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+
+    .header {
+      text-align: center;
+      margin-bottom: 30px;
+    }
+
+    .header h1 {
+      font-size: 3rem;
+      background: linear-gradient(90deg, rgb(240, 151, 110), rgb(255, 180, 145));
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+      text-shadow: 0 2px 20px rgba(240, 151, 110, 0.4);
+    }
+
+    .top-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 25px;
+    }
+
+    .search-box {
+      width: 100%;
+      padding: 12px;
+      background-color: #2f2f2f;
+      border: none;
+      border-radius: 8px;
+      color: #ffffff;
+      font-size: 16px;
+      transition: box-shadow 0.3s ease;
+    }
+
+    .search-box:focus {
+      outline: none;
+      box-shadow: 0 0 10px rgba(240, 151, 110, 0.6);
+    }
+
+    .sort-select {
+      margin-left: 15px;
+      padding: 10px;
+      border-radius: 8px;
+      background-color: #2f2f2f;
+      color: #fff;
+      border: none;
+    }
+
+    .scripts-container {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 20px;
+    }
+
+    .script-card {
+      background: linear-gradient(160deg, #2c2c2c, #3a3a3a);
+      padding: 20px;
+      border-radius: 12px;
+      border: 1px solid rgba(255, 180, 145, 0.15);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+      transition: all 0.3s ease;
+      opacity: 0;
+      transform: translateY(20px);
+      animation: fadeIn 0.5s ease forwards;
+    }
+
+    @keyframes fadeIn {
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .script-card:hover {
+      transform: translateY(-5px);
+      box-shadow: 0 8px 20px rgba(240, 151, 110, 0.3);
+      border-color: rgba(255, 180, 145, 0.4);
+    }
+
+    .script-title {
+      font-size: 20px;
+      color: rgb(255, 180, 145);
+      margin-bottom: 10px;
+    }
+
+    .script-description {
+      font-size: 14px;
+      color: #ccc;
+      margin-bottom: 15px;
+    }
+
+    .copy-button {
+      background: linear-gradient(90deg, rgb(240, 151, 110), rgb(255, 180, 145));
+      color: white;
+      border: none;
+      padding: 10px;
+      border-radius: 6px;
+      font-weight: bold;
+      cursor: pointer;
+      width: 100%;
+      transition: all 0.3s ease;
+    }
+
+    .copy-button:hover {
+      background: linear-gradient(90deg, rgb(255, 180, 145), rgb(240, 151, 110));
+      box-shadow: 0 4px 15px rgba(255, 180, 145, 0.3);
+      transform: scale(1.03);
+    }
+
+    .toast-container {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      z-index: 1000;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .toast {
+      background: linear-gradient(45deg, rgb(240, 151, 110), rgb(255, 180, 145));
+      color: white;
+      padding: 12px 20px;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      opacity: 0;
+      transform: translateX(100%);
+      animation: slideIn 0.3s ease-out forwards;
+      box-shadow: 0 4px 12px rgba(240, 151, 110, 0.3);
+    }
+
+    .toast.removing {
+      animation: slideOut 0.3s ease-in forwards;
+    }
+
+    @keyframes slideIn {
+      to {
+        transform: translateX(0);
+        opacity: 1;
+      }
+    }
+
+    @keyframes slideOut {
+      from {
+        transform: translateX(0);
+        opacity: 1;
+      }
+      to {
+        transform: translateX(100%);
+        opacity: 0;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>DIVA's Script Hub</h1>
+    </div>
+    <div class="top-bar">
+      <input type="text" class="search-box" placeholder="Search scripts..." id="searchInput" />
+      <select id="sortSelect" class="sort-select">
+        <option value="az">Sort A–Z</option>
+        <option value="za">Sort Z–A</option>
+      </select>
+    </div>
+    <div class="scripts-container" id="scriptsContainer">
+      <p>Loading...</p>
+    </div>
+  </div>
+  <div class="toast-container" id="toastContainer"></div>
+
+  <script>
+    const proxies = [
+      'https://cors-anywhere.herokuapp.com/',
+      'https://api.codetabs.com/v1/proxy/?quest=',
+      'https://thingproxy.freeboard.io/fetch/'
+    ];
+    let proxy = 0;
+    let currentScripts = [];
+
+    async function loadScripts() {
+      const container = document.getElementById('scriptsContainer');
+      container.innerHTML = '<p>Loading...</p>';
+      try {
+        const res = await fetch(`${proxies[proxy]}https://scriptblox.com/api/script/fetch`);
+        const data = await res.json();
+        if (data?.result?.scripts) {
+          currentScripts = data.result.scripts;
+          renderScripts(currentScripts);
+        }
+      } catch (err) {
+        console.error('Proxy failed. Trying next...', err);
+        proxy = (proxy + 1) % proxies.length;
+        setTimeout(loadScripts, 1000);
+      }
+    }
+
+    async function searchScripts(query) {
+      const container = document.getElementById('scriptsContainer');
+      container.innerHTML = '<p>Loading...</p>';
+      try {
+        const res = await fetch(`${proxies[proxy]}https://scriptblox.com/api/script/search?q=${encodeURIComponent(query)}`);
+        const data = await res.json();
+        if (data?.result?.scripts?.length) {
+          currentScripts = data.result.scripts;
+          renderScripts(currentScripts);
+        } else {
+          container.innerHTML = '<p>No scripts found.</p>';
+        }
+      } catch (err) {
+        console.error('Search proxy failed. Trying next...', err);
+        proxy = (proxy + 1) % proxies.length;
+        setTimeout(() => searchScripts(query), 1000);
+      }
+    }
+
+    function renderScripts(scripts) {
+      const sort = document.getElementById('sortSelect').value;
+      if (sort === 'az') {
+        scripts.sort((a, b) => a.title.localeCompare(b.title));
+      } else if (sort === 'za') {
+        scripts.sort((a, b) => b.title.localeCompare(a.title));
+      }
+
+      const container = document.getElementById('scriptsContainer');
+      container.innerHTML = '';
+      scripts.forEach((script, index) => {
+        const card = document.createElement('div');
+        card.className = 'script-card';
+        card.style.animationDelay = `${index * 50}ms`;
+        card.innerHTML = `
+          <h3 class="script-title">📜 ${script.title}</h3>
+          <p class="script-description">🎮 Game: ${script.game?.name || 'Unknown'}</p>
+          <button class="copy-button" data-script="${script.script.replace(/"/g, '&quot;')}">Copy Script</button>
+        `;
+        card.querySelector('.copy-button').addEventListener('click', () => {
+          copyScript(script.script, script.title);
+        });
+        container.appendChild(card);
+      });
+    }
+
+    function showToast(text) {
+      const toast = document.createElement('div');
+      toast.className = 'toast';
+      toast.innerHTML = `<span>✓</span><span>${text} copied to clipboard!</span>`;
+      document.getElementById('toastContainer').appendChild(toast);
+      setTimeout(() => {
+        toast.classList.add('removing');
+        setTimeout(() => toast.remove(), 300);
+      }, 3000);
+    }
+
+    async function copyScript(code, name) {
+      try {
+        await navigator.clipboard.writeText(code);
+      } catch {
+        const textarea = document.createElement('textarea');
+        textarea.value = code;
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textarea);
+      }
+      showToast(name);
+    }
+
+    document.getElementById('searchInput').addEventListener('input', (e) => {
+      const query = e.target.value.trim();
+      if (query === '') {
+        loadScripts();
+      } else {
+        searchScripts(query);
+      }
+    });
+
+    document.getElementById('sortSelect').addEventListener('change', () => {
+      renderScripts(currentScripts);
+    });
+
+    loadScripts();
+  </script>
+</body>
+</html>
